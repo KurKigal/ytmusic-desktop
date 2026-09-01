@@ -1,13 +1,13 @@
 mod controller;
 mod model;
+mod observer;
 mod store;
 
 pub use controller::control_player;
 
-pub(crate) use controller::{
-    dispatch_player_command,
-    PlayerCommand,
-};
+pub(crate) use controller::{dispatch_player_command, PlayerCommand};
+
+pub(crate) use observer::start_player_state_observer;
 
 pub use model::*;
 pub use store::PlayerStore;
@@ -21,65 +21,7 @@ pub fn update_player_state(
 ) -> Result<(), String> {
     payload.validate()?;
 
-    let (previous, current) = store.update(payload)?;
-
-    if let Some(previous) = previous {
-        if track_changed(&previous, &current) {
-            log_track_change(&current);
-        }
-
-        if previous.playback != current.playback {
-            println!(
-                "[player] playback changed: {:?}",
-                current.playback
-            );
-        }
-    } else {
-        log_track_change(&current);
-
-        println!(
-            "[player] playback initialized: {:?}",
-            current.playback
-        );
-    }
+    store.update(payload)?;
 
     Ok(())
-}
-
-fn track_changed(
-    previous: &PlayerSnapshot,
-    current: &PlayerSnapshot,
-) -> bool {
-    match (&previous.metadata, &current.metadata) {
-        (None, None) => false,
-
-        (Some(_), None) | (None, Some(_)) => true,
-
-        (Some(previous), Some(current)) => {
-            previous.title != current.title
-                || previous.artist != current.artist
-                || previous.album != current.album
-        }
-    }
-}
-
-fn log_track_change(snapshot: &PlayerSnapshot) {
-    let Some(metadata) = &snapshot.metadata else {
-        println!("[player] track metadata unavailable");
-        return;
-    };
-
-    let title = metadata
-        .title
-        .as_deref()
-        .unwrap_or("Unknown title");
-
-    let artist = metadata
-        .artist
-        .as_deref()
-        .unwrap_or("Unknown artist");
-
-    println!(
-        "[player] track changed: {title} — {artist}"
-    );
 }

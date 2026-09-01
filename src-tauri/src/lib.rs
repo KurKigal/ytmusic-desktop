@@ -1,24 +1,13 @@
 mod integrations;
 mod player;
 
-use integrations::{
-    install_close_to_tray,
-    setup_tray,
-};
+use integrations::{install_close_to_tray, setup_tray};
 
-use player::{
-    control_player,
-    update_player_state,
-    PlayerStore,
-};
+use player::{control_player, start_player_state_observer, update_player_state, PlayerStore};
 
-use tauri::{
-    WebviewUrl,
-    WebviewWindowBuilder,
-};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-const YTMUSIC_INIT_SCRIPT: &str =
-    include_str!("../injected/ytmusic.js");
+const YTMUSIC_INIT_SCRIPT: &str = include_str!("../injected/ytmusic.js");
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,25 +19,22 @@ pub fn run() {
             control_player,
         ])
         .setup(|app| {
+            // Start native player-state subscribers before
+            // creating the YouTube Music WebView.
+            start_player_state_observer(app);
+
             let url = "https://music.youtube.com"
                 .parse()
                 .expect("invalid YouTube Music URL");
 
-            let main_window =
-                WebviewWindowBuilder::new(
-                    app,
-                    "main",
-                    WebviewUrl::External(url),
-                )
+            let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("YTMusic Desktop")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(900.0, 600.0)
                 .center()
                 .resizable(true)
                 .devtools(true)
-                .initialization_script(
-                    YTMUSIC_INIT_SCRIPT,
-                )
+                .initialization_script(YTMUSIC_INIT_SCRIPT)
                 .build()?;
 
             install_close_to_tray(&main_window);
@@ -58,7 +44,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect(
-            "error while running Tauri application",
-        );
+        .expect("error while running Tauri application");
 }

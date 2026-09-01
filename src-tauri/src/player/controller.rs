@@ -9,9 +9,7 @@ pub enum PlayerCommand {
     TogglePlayback,
     Next,
     Previous,
-    Seek {
-        position: f64,
-    },
+    Seek { position: f64 },
 }
 
 impl PlayerCommand {
@@ -31,10 +29,7 @@ impl PlayerCommand {
 ///
 /// Native integrations such as tray controls and MPRIS will call
 /// this function directly in later milestones.
-pub fn dispatch_player_command(
-    app: &AppHandle,
-    command: PlayerCommand,
-) -> Result<(), String> {
+pub fn dispatch_player_command(app: &AppHandle, command: PlayerCommand) -> Result<(), String> {
     command.validate()?;
 
     let webview = app
@@ -78,9 +73,6 @@ pub fn dispatch_player_command(
 /// Native integrations should prefer `dispatch_player_command`
 /// directly instead of going through IPC.
 #[tauri::command]
-pub fn control_player(
-    app: AppHandle,
-    command: PlayerCommand,
-) -> Result<(), String> {
+pub fn control_player(app: AppHandle, command: PlayerCommand) -> Result<(), String> {
     dispatch_player_command(&app, command)
 }

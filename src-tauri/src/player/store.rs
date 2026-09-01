@@ -1,46 +1,47 @@
-use std::sync::RwLock;
+use tokio::sync::watch;
 
 use super::model::PlayerSnapshot;
 
-#[derive(Default)]
+/// Stores the latest player state and broadcasts updates
+/// to native integrations.
+///
+/// A watch channel is used because consumers generally care
+/// about the latest state rather than every intermediate update.
 pub struct PlayerStore {
-    state: RwLock<Option<PlayerSnapshot>>,
+    updates: watch::Sender<Option<PlayerSnapshot>>,
+}
+
+impl Default for PlayerStore {
+    fn default() -> Self {
+        let (updates, _) = watch::channel(None);
+
+        Self { updates }
+    }
 }
 
 impl PlayerStore {
-    pub fn update(
-        &self,
-        mut next: PlayerSnapshot,
-    ) -> Result<(Option<PlayerSnapshot>, PlayerSnapshot), String> {
-        let mut state = self
-            .state
-            .write()
-            .map_err(|_| "player state lock is poisoned".to_string())?;
+    /// Normalizes and stores a new player snapshot.
+    ///
+    /// YouTube Music can temporarily clear MediaSession metadata
+    /// during navigation or track transitions. In that case, the
+    /// last known metadata is preserved.
+    pub fn update(&self, mut next: PlayerSnapshot) -> Result<PlayerSnapshot, String> {
+        let previous = self.updates.borrow().clone();
 
-        let previous = state.clone();
-
-        // YouTube Music may temporarily clear MediaSession metadata
-        // while navigating or changing tracks. Preserve the last
-        // known metadata during these transient gaps.
         if next.metadata.is_none() {
-            if let Some(previous_state) = &previous {
-                next.metadata = previous_state.metadata.clone();
+            if let Some(previous_state) = previous {
+                next.metadata = previous_state.metadata;
             }
         }
 
-        *state = Some(next.clone());
+        self.updates.send_replace(Some(next.clone()));
 
-        Ok((previous, next))
+        Ok(next)
     }
 
-    pub fn snapshot(
-        &self,
-    ) -> Result<Option<PlayerSnapshot>, String> {
-        let state = self
-            .state
-            .read()
-            .map_err(|_| "player state lock is poisoned".to_string())?;
-
-        Ok(state.clone())
+    /// Creates a new subscriber that receives the latest
+    /// player state whenever it changes.
+    pub fn subscribe(&self) -> watch::Receiver<Option<PlayerSnapshot>> {
+        self.updates.subscribe()
     }
 }

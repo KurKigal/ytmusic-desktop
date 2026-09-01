@@ -14,9 +14,7 @@ pub fn install_close_to_tray(window: &WebviewWindow) {
             api.prevent_close();
 
             if let Err(error) = window_for_event.hide() {
-                eprintln!(
-                    "[window] failed to hide main window: {error}"
-                );
+                eprintln!("[window] failed to hide main window: {error}");
             } else {
                 println!("[window] main window hidden to tray");
             }
