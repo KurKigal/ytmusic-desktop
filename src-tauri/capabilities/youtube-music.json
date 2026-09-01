@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/remote-schema.json",
+  "identifier": "youtube-music-bridge",
+  "description": "Allows music.youtube.com to send player state updates to the native core.",
+  "windows": ["main"],
+  "local": false,
+  "remote": {
+    "urls": ["https://music.youtube.com/*"]
+  },
+  "permissions": [
+    "allow-player-state-update"
+  ]
+}
