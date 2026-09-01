@@ -10,8 +10,8 @@ pub struct PlayerStore {
 impl PlayerStore {
     pub fn update(
         &self,
-        next: PlayerSnapshot,
-    ) -> Result<Option<PlayerSnapshot>, String> {
+        mut next: PlayerSnapshot,
+    ) -> Result<(Option<PlayerSnapshot>, PlayerSnapshot), String> {
         let mut state = self
             .state
             .write()
@@ -19,13 +19,23 @@ impl PlayerStore {
 
         let previous = state.clone();
 
-        *state = Some(next);
+        // YouTube Music may temporarily clear MediaSession metadata
+        // while navigating or changing tracks. Preserve the last
+        // known metadata during these transient gaps.
+        if next.metadata.is_none() {
+            if let Some(previous_state) = &previous {
+                next.metadata = previous_state.metadata.clone();
+            }
+        }
 
-        Ok(previous)
+        *state = Some(next.clone());
+
+        Ok((previous, next))
     }
 
-    #[allow(dead_code)]
-    pub fn snapshot(&self) -> Result<Option<PlayerSnapshot>, String> {
+    pub fn snapshot(
+        &self,
+    ) -> Result<Option<PlayerSnapshot>, String> {
         let state = self
             .state
             .read()

@@ -1,4 +1,10 @@
+mod integrations;
 mod player;
+
+use integrations::{
+    install_close_to_tray,
+    setup_tray,
+};
 
 use player::{
     control_player,
@@ -28,22 +34,31 @@ pub fn run() {
                 .parse()
                 .expect("invalid YouTube Music URL");
 
-            WebviewWindowBuilder::new(
-                app,
-                "main",
-                WebviewUrl::External(url),
-            )
-            .title("YTMusic Desktop")
-            .inner_size(1280.0, 800.0)
-            .min_inner_size(900.0, 600.0)
-            .center()
-            .resizable(true)
-            .devtools(true)
-            .initialization_script(YTMUSIC_INIT_SCRIPT)
-            .build()?;
+            let main_window =
+                WebviewWindowBuilder::new(
+                    app,
+                    "main",
+                    WebviewUrl::External(url),
+                )
+                .title("YTMusic Desktop")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(900.0, 600.0)
+                .center()
+                .resizable(true)
+                .devtools(true)
+                .initialization_script(
+                    YTMUSIC_INIT_SCRIPT,
+                )
+                .build()?;
+
+            install_close_to_tray(&main_window);
+
+            setup_tray(app)?;
 
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Tauri application");
+        .expect(
+            "error while running Tauri application",
+        );
 }

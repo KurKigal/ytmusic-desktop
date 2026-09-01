@@ -3,6 +3,12 @@ mod model;
 mod store;
 
 pub use controller::control_player;
+
+pub(crate) use controller::{
+    dispatch_player_command,
+    PlayerCommand,
+};
+
 pub use model::*;
 pub use store::PlayerStore;
 
@@ -15,25 +21,25 @@ pub fn update_player_state(
 ) -> Result<(), String> {
     payload.validate()?;
 
-    let previous = store.update(payload.clone())?;
+    let (previous, current) = store.update(payload)?;
 
     if let Some(previous) = previous {
-        if track_changed(&previous, &payload) {
-            log_track_change(&payload);
+        if track_changed(&previous, &current) {
+            log_track_change(&current);
         }
 
-        if previous.playback != payload.playback {
+        if previous.playback != current.playback {
             println!(
                 "[player] playback changed: {:?}",
-                payload.playback
+                current.playback
             );
         }
     } else {
-        log_track_change(&payload);
+        log_track_change(&current);
 
         println!(
             "[player] playback initialized: {:?}",
-            payload.playback
+            current.playback
         );
     }
 
