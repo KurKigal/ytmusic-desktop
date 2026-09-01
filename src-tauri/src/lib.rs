@@ -1,7 +1,9 @@
 mod integrations;
 mod player;
 
-use integrations::{install_close_to_tray, setup_tray};
+use integrations::{
+    configure_windows_identity, install_close_to_tray, setup_native_media_controls, setup_tray,
+};
 
 use player::{control_player, start_player_state_observer, update_player_state, PlayerStore};
 
@@ -11,6 +13,7 @@ const YTMUSIC_INIT_SCRIPT: &str = include_str!("../injected/ytmusic.js");
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    configure_windows_identity();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(PlayerStore::default())
@@ -19,8 +22,6 @@ pub fn run() {
             control_player,
         ])
         .setup(|app| {
-            // Start native player-state subscribers before
-            // creating the YouTube Music WebView.
             start_player_state_observer(app);
 
             let url = "https://music.youtube.com"
@@ -38,6 +39,8 @@ pub fn run() {
                 .build()?;
 
             install_close_to_tray(&main_window);
+
+            setup_native_media_controls(app, &main_window);
 
             setup_tray(app)?;
 

@@ -7,28 +7,32 @@ pub enum PlayerCommand {
     Play,
     Pause,
     TogglePlayback,
+    Stop,
     Next,
     Previous,
     Seek { position: f64 },
+    SeekBy { offset: f64 },
 }
 
 impl PlayerCommand {
     fn validate(&self) -> Result<(), String> {
-        if let Self::Seek { position } = self {
-            if !position.is_finite() || *position < 0.0 {
-                return Err("invalid seek position".into());
+        match self {
+            Self::Seek { position } if !position.is_finite() || *position < 0.0 => {
+                Err("invalid seek position".into())
             }
-        }
 
-        Ok(())
+            Self::SeekBy { offset } if !offset.is_finite() => Err("invalid seek offset".into()),
+
+            _ => Ok(()),
+        }
     }
 }
 
 /// Dispatches a playback command from the Rust core to the
 /// YouTube Music WebView.
 ///
-/// Native integrations such as tray controls and MPRIS will call
-/// this function directly in later milestones.
+/// Native integrations such as tray controls and OS media
+/// controls call this function directly.
 pub fn dispatch_player_command(app: &AppHandle, command: PlayerCommand) -> Result<(), String> {
     command.validate()?;
 

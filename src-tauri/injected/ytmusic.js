@@ -265,6 +265,11 @@ const executeNativeCommand = async (command) => {
       await togglePlayback();
       break;
 
+    case "stop":
+      pause();
+      seek(0);
+      break;
+
     case "next":
       next();
       break;
@@ -276,6 +281,19 @@ const executeNativeCommand = async (command) => {
     case "seek":
       seek(command.position);
       break;
+
+    case "seekBy": {
+      const media = getMediaElement();
+
+      if (!media) {
+        throw new Error(
+          "No active YouTube Music media element found."
+        );
+      }
+
+      seek(media.currentTime + command.offset);
+      break;
+    }
 
     default:
       throw new Error(
