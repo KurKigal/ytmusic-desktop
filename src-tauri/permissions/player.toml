@@ -2,3 +2,8 @@
 identifier = "allow-player-state-update"
 description = "Allows the YouTube Music webview to send player state updates to the Rust core."
 commands.allow = ["update_player_state"]
+
+[[permission]]
+identifier = "allow-player-control"
+description = "Allows controlled playback commands to pass through the Rust player API."
+commands.allow = ["control_player"]

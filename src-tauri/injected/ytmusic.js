@@ -237,6 +237,53 @@
     button.click();
   };
 
+
+  /**
+ * Executes a playback command requested by the Rust core.
+ */
+const executeNativeCommand = async (command) => {
+  if (
+    !command ||
+    typeof command !== "object" ||
+    typeof command.type !== "string"
+  ) {
+    throw new TypeError(
+      "Invalid native player command."
+    );
+  }
+
+  switch (command.type) {
+    case "play":
+      await play();
+      break;
+
+    case "pause":
+      pause();
+      break;
+
+    case "togglePlayback":
+      await togglePlayback();
+      break;
+
+    case "next":
+      next();
+      break;
+
+    case "previous":
+      previous();
+      break;
+
+    case "seek":
+      seek(command.position);
+      break;
+
+    default:
+      throw new Error(
+        `Unknown native player command: ${command.type}`
+      );
+  }
+};
+
   // ---------------------------------------------------------
   // Native state synchronization
   // ---------------------------------------------------------
@@ -336,6 +383,9 @@
     seek,
     next,
     previous,
+    
+    // Native command bridge
+    executeNativeCommand,
   });
 
   // ---------------------------------------------------------

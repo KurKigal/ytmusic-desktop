@@ -1,7 +1,15 @@
 mod player;
 
-use player::{update_player_state, PlayerStore};
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use player::{
+    control_player,
+    update_player_state,
+    PlayerStore,
+};
+
+use tauri::{
+    WebviewUrl,
+    WebviewWindowBuilder,
+};
 
 const YTMUSIC_INIT_SCRIPT: &str =
     include_str!("../injected/ytmusic.js");
@@ -12,7 +20,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(PlayerStore::default())
         .invoke_handler(tauri::generate_handler![
-            update_player_state
+            update_player_state,
+            control_player,
         ])
         .setup(|app| {
             let url = "https://music.youtube.com"

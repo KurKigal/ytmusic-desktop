@@ -1,6 +1,8 @@
+mod controller;
 mod model;
 mod store;
 
+pub use controller::control_player;
 pub use model::*;
 pub use store::PlayerStore;
 
@@ -16,7 +18,7 @@ pub fn update_player_state(
     let previous = store.update(payload.clone())?;
 
     if let Some(previous) = previous {
-        if previous.metadata != payload.metadata {
+        if track_changed(&previous, &payload) {
             log_track_change(&payload);
         }
 
@@ -38,6 +40,23 @@ pub fn update_player_state(
     Ok(())
 }
 
+fn track_changed(
+    previous: &PlayerSnapshot,
+    current: &PlayerSnapshot,
+) -> bool {
+    match (&previous.metadata, &current.metadata) {
+        (None, None) => false,
+
+        (Some(_), None) | (None, Some(_)) => true,
+
+        (Some(previous), Some(current)) => {
+            previous.title != current.title
+                || previous.artist != current.artist
+                || previous.album != current.album
+        }
+    }
+}
+
 fn log_track_change(snapshot: &PlayerSnapshot) {
     let Some(metadata) = &snapshot.metadata else {
         println!("[player] track metadata unavailable");
@@ -54,5 +73,7 @@ fn log_track_change(snapshot: &PlayerSnapshot) {
         .as_deref()
         .unwrap_or("Unknown artist");
 
-    println!("[player] track changed: {title} — {artist}");
+    println!(
+        "[player] track changed: {title} — {artist}"
+    );
 }
