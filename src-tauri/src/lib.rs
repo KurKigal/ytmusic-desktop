@@ -2,7 +2,8 @@ mod integrations;
 mod player;
 
 use integrations::{
-    configure_windows_identity, install_close_to_tray, setup_native_media_controls, setup_tray,
+    configure_windows_identity, install_close_to_tray, setup_discord_presence,
+    setup_native_media_controls, setup_tray,
 };
 
 use player::{control_player, start_player_state_observer, update_player_state, PlayerStore};
@@ -23,6 +24,10 @@ pub fn run() {
         ])
         .setup(|app| {
             start_player_state_observer(app);
+
+            // Subscribe before the WebView starts publishing
+            // player snapshots.
+            setup_discord_presence(app);
 
             let url = "https://music.youtube.com"
                 .parse()
