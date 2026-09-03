@@ -65,9 +65,10 @@ impl ShortcutManager {
         self.update_shortcut_with(&TauriRegistrationBackend { app }, store, action, shortcut)
     }
 
-    /// Replaces all configured registrations with the defaults as one
-    /// operation. If any default cannot be registered, every successfully
-    /// removed previous registration is restored and settings stay unchanged.
+    /// Restores the complete application settings and all configured shortcut
+    /// registrations as one operation. If any default shortcut cannot be
+    /// registered, every removed registration is restored and settings stay
+    /// unchanged.
     pub fn restore_defaults(
         &self,
         app: &AppHandle,
@@ -205,9 +206,7 @@ impl ShortcutManager {
         P: SettingsPersistence,
     {
         let mut state = self.state();
-        let current = persistence.snapshot();
-        let mut defaults = current.clone();
-        defaults.shortcuts = ShortcutSettings::default();
+        let defaults = AppSettings::default();
         let default_bindings = validated_bindings(&defaults.shortcuts)?;
         let previous_bindings = state.registrations.clone();
         let mut removed_previous = Vec::new();
@@ -257,7 +256,7 @@ impl ShortcutManager {
                 remove_bindings(backend, &mut state, registered_defaults.into_iter().rev());
             rollback_errors.extend(restore_bindings(backend, &mut state, previous_bindings));
             return Err(with_rollback_errors(
-                format!("failed to persist default shortcuts: {error}"),
+                format!("failed to persist default settings: {error}"),
                 rollback_errors,
             ));
         }
@@ -767,7 +766,7 @@ mod tests {
     fn restore_defaults_rolls_back_all_registrations_on_conflict() {
         let backend = FakeBackend::default();
         let manager = ShortcutManager::default();
-        let settings = AppSettings {
+        let mut settings = AppSettings {
             shortcuts: ShortcutSettings {
                 play_pause: "Ctrl+Shift+P".to_string(),
                 next: "Ctrl+Shift+N".to_string(),
@@ -775,7 +774,13 @@ mod tests {
                 seek_forward_10: "Ctrl+Shift+F".to_string(),
                 seek_backward_10: "Ctrl+Shift+R".to_string(),
             },
+            ..AppSettings::default()
         };
+        settings.application.language = crate::settings::Language::Turkish;
+        settings.application.discord_rich_presence_enabled = false;
+        settings.application.close_to_tray = false;
+        settings.application.start_minimized = true;
+        settings.application.mini_player_always_on_top = true;
         let persistence = FakePersistence::new(settings.clone());
         let report = manager.register_startup_with(&backend, &settings.shortcuts);
         assert!(report.failures.is_empty());
@@ -804,6 +809,7 @@ mod tests {
                 seek_forward_10: "Ctrl+Shift+F".to_string(),
                 seek_backward_10: "Ctrl+Shift+R".to_string(),
             },
+            ..AppSettings::default()
         };
         let persistence = FakePersistence::new(settings.clone());
         let report = manager.register_startup_with(&backend, &settings.shortcuts);
@@ -828,7 +834,7 @@ mod tests {
     fn restore_defaults_registers_and_persists_every_default() {
         let backend = FakeBackend::default();
         let manager = ShortcutManager::default();
-        let settings = AppSettings {
+        let mut settings = AppSettings {
             shortcuts: ShortcutSettings {
                 play_pause: "Ctrl+Shift+P".to_string(),
                 next: "Ctrl+Shift+N".to_string(),
@@ -836,7 +842,13 @@ mod tests {
                 seek_forward_10: "Ctrl+Shift+F".to_string(),
                 seek_backward_10: "Ctrl+Shift+R".to_string(),
             },
+            ..AppSettings::default()
         };
+        settings.application.language = crate::settings::Language::Turkish;
+        settings.application.discord_rich_presence_enabled = false;
+        settings.application.close_to_tray = false;
+        settings.application.start_minimized = true;
+        settings.application.mini_player_always_on_top = true;
         let persistence = FakePersistence::new(settings.clone());
         let report = manager.register_startup_with(&backend, &settings.shortcuts);
         assert!(report.failures.is_empty());

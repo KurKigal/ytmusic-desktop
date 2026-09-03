@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="/src/mini-player.css" />
-    <title>YTMusic Desktop Mini Player</title>
+    <title>YTMusic Desktop</title>
     <script type="module" src="/src/mini-player.ts" defer></script>
   </head>
 
   <body>
-    <main class="mini-player" aria-label="YTMusic Desktop mini player">
+    <main id="mini-player" class="mini-player">
       <div class="artwork-frame">
         <img id="artwork" class="artwork" alt="" hidden />
         <div id="artwork-placeholder" class="artwork-placeholder" aria-hidden="true">
@@ -24,17 +24,15 @@
 
       <section class="player-content" aria-labelledby="track-title">
         <header class="track-copy">
-          <h1 id="track-title">Waiting for playback</h1>
-          <p id="track-artist">Start playing music in YouTube Music</p>
+          <h1 id="track-title"></h1>
+          <p id="track-artist"></p>
         </header>
 
-        <div class="controls" aria-label="Playback controls">
+        <div id="playback-controls" class="controls">
           <button
             id="previous"
             class="control-button"
             type="button"
-            aria-label="Previous track"
-            title="Previous track"
             disabled
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -46,7 +44,6 @@
             id="play-pause"
             class="control-button primary-control"
             type="button"
-            aria-label="Play"
             disabled
           >
             <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -61,8 +58,6 @@
             id="next"
             class="control-button"
             type="button"
-            aria-label="Next track"
-            title="Next track"
             disabled
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -81,8 +76,6 @@
             max="0"
             step="1"
             value="0"
-            aria-label="Track position"
-            aria-valuetext="0:00 of 0:00"
             disabled
           />
           <span id="duration" class="time-label">0:00</span>

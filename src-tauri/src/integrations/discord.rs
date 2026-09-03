@@ -5,6 +5,7 @@ use std::{
 };
 
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use tokio::sync::watch;
 
 use tauri::{App, Manager};
 
@@ -35,56 +36,160 @@ const DISCORD_TEXT_LIMIT: usize = 128;
 
 const YOUTUBE_MUSIC_URL: &str = "https://music.youtube.com";
 
-/// Starts the Discord Rich Presence integration.
+/// Controls whether the Discord Rich Presence worker is active.
+///
+/// Clones share the same watch channel, so settings updates can wake the
+/// worker without polling or coupling the caller to Discord IPC details.
+#[derive(Clone)]
+pub struct DiscordController {
+    enabled: watch::Sender<bool>,
+}
+
+impl DiscordController {
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.send_if_modified(|current| {
+            if *current == enabled {
+                return false;
+            }
+
+            *current = enabled;
+            true
+        });
+    }
+}
+
+/// Starts the Discord Rich Presence integration and returns its runtime
+/// controller.
 ///
 /// The PlayerStore receiver is consumed on a dedicated thread because
 /// Discord IPC uses synchronous I/O. A watch receiver is kept end-to-end so
 /// slow Discord operations coalesce intermediate player ticks instead of
 /// replaying stale snapshots later.
-pub fn setup_discord_presence(app: &App) {
+pub fn setup_discord_presence(app: &App, initially_enabled: bool) -> DiscordController {
+    let (enabled, enabled_receiver) = watch::channel(initially_enabled);
+    let controller = DiscordController { enabled };
+
     if DISCORD_CLIENT_ID.trim().is_empty() || DISCORD_CLIENT_ID == "YOUR_DISCORD_APPLICATION_ID" {
         eprintln!("[discord] Discord Application ID is not configured");
 
-        return;
+        return controller;
     }
 
-    let mut player_receiver = app.state::<PlayerStore>().subscribe();
+    let player_receiver = app.state::<PlayerStore>().subscribe();
 
     let worker = thread::Builder::new()
         .name("discord-rpc".to_string())
-        .spawn(move || {
-            let mut presence = DiscordPresence::new();
-
-            let initial = player_receiver.borrow_and_update().clone();
-
-            if let Some(snapshot) = initial {
-                presence.sync(&snapshot);
-            }
-
-            loop {
-                if tauri::async_runtime::block_on(player_receiver.changed()).is_err() {
-                    break;
-                }
-
-                let current = player_receiver.borrow_and_update().clone();
-
-                let Some(current) = current else {
-                    continue;
-                };
-
-                presence.sync(&current);
-            }
-
-            presence.shutdown();
-        });
+        .spawn(move || run_discord_worker(player_receiver, enabled_receiver));
 
     if let Err(error) = worker {
         eprintln!("[discord] failed to start worker thread: {error}");
 
-        return;
+        return controller;
     }
 
-    println!("[discord] Rich Presence integration initialized");
+    let status = if initially_enabled {
+        "enabled"
+    } else {
+        "disabled"
+    };
+    println!("[discord] Rich Presence integration initialized ({status})");
+
+    controller
+}
+
+fn run_discord_worker(
+    mut player_receiver: watch::Receiver<Option<PlayerSnapshot>>,
+    mut enabled_receiver: watch::Receiver<bool>,
+) {
+    let mut presence = DiscordPresence::new();
+    let mut enabled = *enabled_receiver.borrow_and_update();
+
+    if enabled {
+        sync_latest(&mut presence, &mut player_receiver);
+    } else {
+        player_receiver.borrow_and_update();
+    }
+
+    loop {
+        let event = tauri::async_runtime::block_on(async {
+            tokio::select! {
+                biased;
+                result = enabled_receiver.changed() => WorkerEvent::Enabled(result),
+                result = player_receiver.changed() => WorkerEvent::Player(result),
+            }
+        });
+
+        match event {
+            WorkerEvent::Enabled(Ok(())) => {
+                let next_enabled = *enabled_receiver.borrow_and_update();
+
+                match enable_transition(enabled, next_enabled) {
+                    EnableTransition::Enable => {
+                        enabled = true;
+                        presence.prepare_to_enable();
+                        sync_latest(&mut presence, &mut player_receiver);
+                        println!("[discord] Rich Presence integration enabled");
+                    }
+                    EnableTransition::Disable => {
+                        enabled = false;
+                        presence.disable();
+                        println!("[discord] Rich Presence integration disabled");
+                    }
+                    EnableTransition::Unchanged => {}
+                }
+            }
+            WorkerEvent::Player(Ok(())) => {
+                if enabled {
+                    sync_latest(&mut presence, &mut player_receiver);
+                } else {
+                    player_receiver.borrow_and_update();
+                }
+            }
+            WorkerEvent::Enabled(Err(_)) | WorkerEvent::Player(Err(_)) => break,
+        }
+    }
+
+    presence.shutdown();
+}
+
+fn sync_latest(
+    presence: &mut DiscordPresence,
+    player_receiver: &mut watch::Receiver<Option<PlayerSnapshot>>,
+) {
+    let current = player_receiver.borrow_and_update().clone();
+    let Some(current) = current else {
+        return;
+    };
+
+    if presence.sync(&current) == SyncResult::JustConnected {
+        // A Discord handshake can block. Re-read the coalescing watch channel
+        // so the first published activity uses the newest PlayerStore value.
+        let latest = player_receiver.borrow_and_update().clone();
+
+        if let Some(latest) = latest {
+            presence.sync(&latest);
+        }
+    }
+}
+
+enum WorkerEvent {
+    Enabled(Result<(), watch::error::RecvError>),
+    Player(Result<(), watch::error::RecvError>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EnableTransition {
+    Enable,
+    Disable,
+    Unchanged,
+}
+
+fn enable_transition(current: bool, next: bool) -> EnableTransition {
+    match (current, next) {
+        (false, true) => EnableTransition::Enable,
+        (true, false) => EnableTransition::Disable,
+        _ => EnableTransition::Unchanged,
+    }
 }
 
 struct DiscordPresence {
@@ -101,6 +206,12 @@ enum ConnectionState {
     Unavailable,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SyncResult {
+    Complete,
+    JustConnected,
+}
+
 impl DiscordPresence {
     fn new() -> Self {
         Self {
@@ -112,29 +223,30 @@ impl DiscordPresence {
         }
     }
 
-    fn sync(&mut self, snapshot: &PlayerSnapshot) {
+    fn sync(&mut self, snapshot: &PlayerSnapshot) -> SyncResult {
         let Some(now) = unix_timestamp_seconds() else {
-            return;
+            return SyncResult::Complete;
         };
 
         let desired = match self.activity.evaluate(snapshot, now) {
             ActivityPlan::Publish(desired) => desired,
             ActivityPlan::Clear => {
                 self.clear_if_needed();
-                return;
+                return SyncResult::Complete;
             }
-            ActivityPlan::Hold | ActivityPlan::Ignore => return,
+            ActivityPlan::Hold | ActivityPlan::Ignore => return SyncResult::Complete,
         };
 
         match self.ensure_connected() {
             ConnectionState::Ready => {}
-            ConnectionState::JustConnected | ConnectionState::Unavailable => return,
+            ConnectionState::JustConnected => return SyncResult::JustConnected,
+            ConnectionState::Unavailable => return SyncResult::Complete,
         }
 
         let observed_at = Instant::now();
 
         if !self.rate_limiter.allows_activity_update(observed_at) {
-            return;
+            return SyncResult::Complete;
         }
 
         let activity = build_activity(&desired);
@@ -154,6 +266,8 @@ impl DiscordPresence {
                 self.handle_connection_error(&format!("failed to update activity: {error}"));
             }
         }
+
+        SyncResult::Complete
     }
 
     fn ensure_connected(&mut self) -> ConnectionState {
@@ -224,6 +338,36 @@ impl DiscordPresence {
         self.connected = false;
         self.activity.mark_hidden();
         self.next_retry_at = Instant::now() + DISCORD_RETRY_INTERVAL;
+    }
+
+    fn prepare_to_enable(&mut self) {
+        self.activity = ActivityPlanner::default();
+        self.next_retry_at = Instant::now();
+    }
+
+    fn disable(&mut self) {
+        if self.connected {
+            if self.activity.is_visible() {
+                let observed_at = Instant::now();
+
+                match self.client.clear_activity() {
+                    Ok(()) => {
+                        self.rate_limiter.record(observed_at);
+                        println!("[discord] activity cleared");
+                    }
+                    Err(error) => {
+                        eprintln!("[discord] failed to clear activity while disabling: {error}");
+                    }
+                }
+            }
+
+            let _ = self.client.close();
+        }
+
+        self.client = DiscordIpcClient::new(DISCORD_CLIENT_ID);
+        self.connected = false;
+        self.activity = ActivityPlanner::default();
+        self.next_retry_at = Instant::now();
     }
 
     fn shutdown(&mut self) {
@@ -773,6 +917,14 @@ mod tests {
             .iter()
             .filter(|plan| matches!(plan, ActivityPlan::Clear))
             .count()
+    }
+
+    #[test]
+    fn enable_transition_only_requests_work_when_the_setting_changes() {
+        assert_eq!(enable_transition(false, true), EnableTransition::Enable);
+        assert_eq!(enable_transition(true, false), EnableTransition::Disable);
+        assert_eq!(enable_transition(false, false), EnableTransition::Unchanged);
+        assert_eq!(enable_transition(true, true), EnableTransition::Unchanged);
     }
 
     #[test]

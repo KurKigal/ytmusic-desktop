@@ -5,30 +5,69 @@ use tauri::{
 };
 
 use crate::{
+    localization::native_ui_strings,
     mini_player::MINI_PLAYER_WINDOW_LABEL,
     player::{dispatch_player_command, PlayerCommand},
+    settings::{Language, SettingsStore},
 };
 
-/// Creates the native system tray icon and menu.
-pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
-    let open_item = MenuItem::with_id(app, "open", "Open YTMusic Desktop", true, None::<&str>)?;
+struct TrayMenuItems {
+    open: MenuItem<tauri::Wry>,
+    settings: MenuItem<tauri::Wry>,
+    mini_player: MenuItem<tauri::Wry>,
+    play_pause: MenuItem<tauri::Wry>,
+    previous: MenuItem<tauri::Wry>,
+    next: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
+}
 
-    let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+impl TrayMenuItems {
+    fn set_language(&self, language: Language) -> Result<(), String> {
+        let labels = native_ui_strings(language);
+        let updates = [
+            (&self.open, labels.open),
+            (&self.settings, labels.settings),
+            (&self.mini_player, labels.mini_player),
+            (&self.play_pause, labels.play_pause),
+            (&self.previous, labels.previous),
+            (&self.next, labels.next),
+            (&self.quit, labels.quit),
+        ];
+        let errors = updates
+            .into_iter()
+            .filter_map(|(item, text)| item.set_text(text).err().map(|error| error.to_string()))
+            .collect::<Vec<_>>();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("; "))
+        }
+    }
+}
+
+/// Creates the native system tray icon and menu.
+pub fn setup_tray(app: &mut App, language: Language) -> tauri::Result<()> {
+    let labels = native_ui_strings(language);
+    let open_item = MenuItem::with_id(app, "open", labels.open, true, None::<&str>)?;
+
+    let settings_item = MenuItem::with_id(app, "settings", labels.settings, true, None::<&str>)?;
 
     let mini_player_item =
-        MenuItem::with_id(app, "mini_player", "Mini Player", true, None::<&str>)?;
+        MenuItem::with_id(app, "mini_player", labels.mini_player, true, None::<&str>)?;
 
-    let play_pause_item = MenuItem::with_id(app, "play_pause", "Play / Pause", true, None::<&str>)?;
+    let play_pause_item =
+        MenuItem::with_id(app, "play_pause", labels.play_pause, true, None::<&str>)?;
 
-    let previous_item = MenuItem::with_id(app, "previous", "Previous", true, None::<&str>)?;
+    let previous_item = MenuItem::with_id(app, "previous", labels.previous, true, None::<&str>)?;
 
-    let next_item = MenuItem::with_id(app, "next", "Next", true, None::<&str>)?;
+    let next_item = MenuItem::with_id(app, "next", labels.next, true, None::<&str>)?;
 
     let separator_one = PredefinedMenuItem::separator(app)?;
 
     let separator_two = PredefinedMenuItem::separator(app)?;
 
-    let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", labels.quit, true, None::<&str>)?;
 
     let menu = Menu::with_items(
         app,
@@ -110,10 +149,23 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
     }
 
     tray_builder.build(app)?;
+    app.manage(TrayMenuItems {
+        open: open_item,
+        settings: settings_item,
+        mini_player: mini_player_item,
+        play_pause: play_pause_item,
+        previous: previous_item,
+        next: next_item,
+        quit: quit_item,
+    });
 
     println!("[tray] system tray initialized");
 
     Ok(())
+}
+
+pub fn update_tray_language(app: &AppHandle, language: Language) -> Result<(), String> {
+    app.state::<TrayMenuItems>().set_language(language)
 }
 
 fn show_main_window(app: &AppHandle) -> Result<(), String> {
@@ -160,6 +212,16 @@ fn show_mini_player_window(app: &AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window(MINI_PLAYER_WINDOW_LABEL)
         .ok_or_else(|| "mini player webview window not found".to_string())?;
+
+    let always_on_top = app
+        .state::<SettingsStore>()
+        .snapshot()
+        .application
+        .mini_player_always_on_top;
+
+    window
+        .set_always_on_top(always_on_top)
+        .map_err(|error| format!("failed to update mini player always-on-top state: {error}"))?;
 
     window
         .unminimize()

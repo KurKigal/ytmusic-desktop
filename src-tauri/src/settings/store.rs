@@ -5,7 +5,7 @@ use std::{
     sync::RwLock,
 };
 
-use super::AppSettings;
+use super::{AppSettings, ShortcutSettings};
 
 pub struct SettingsStore {
     path: PathBuf,
@@ -73,6 +73,7 @@ impl SettingsStore {
     /// Resets the in-memory snapshot even when the invalid settings file
     /// cannot be replaced. This is reserved for startup recovery so the app
     /// never continues with shortcut data that failed semantic validation.
+    #[cfg(test)]
     pub fn recover_defaults(&self) -> Result<(), String> {
         let defaults = AppSettings::default();
         let mut current = self
@@ -84,7 +85,20 @@ impl SettingsStore {
         persist(&self.path, &defaults)
     }
 
-    #[cfg(test)]
+    /// Repairs only shortcut data that fails platform-level validation while
+    /// preserving otherwise valid application preferences.
+    pub fn recover_shortcut_defaults(&self) -> Result<(), String> {
+        let mut current = self
+            .settings
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut recovered = current.clone();
+        recovered.shortcuts = ShortcutSettings::default();
+
+        *current = recovered.clone();
+        persist(&self.path, &recovered)
+    }
+
     pub fn update<F>(&self, update: F) -> Result<AppSettings, String>
     where
         F: FnOnce(&mut AppSettings),
@@ -287,6 +301,26 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_schema_version_loads_defaults_with_a_warning() {
+        let directory = TestDirectory::new("unsupported-schema");
+        let path = directory.settings_path();
+        let mut settings = AppSettings::default();
+        settings.schema_version += 1;
+        fs::write(
+            &path,
+            serde_json::to_vec(&settings).expect("unsupported schema fixture should serialize"),
+        )
+        .expect("unsupported schema fixture should be written");
+
+        let (store, warning) = SettingsStore::load_with_diagnostics(path);
+
+        assert_eq!(store.snapshot(), AppSettings::default());
+        assert!(warning
+            .as_deref()
+            .is_some_and(|message| message.contains("unsupported settings schema version")));
+    }
+
+    #[test]
     fn rejected_replacement_does_not_change_memory_or_disk() {
         let directory = TestDirectory::new("reject");
         let path = directory.settings_path();
@@ -337,6 +371,52 @@ mod tests {
     }
 
     #[test]
+    fn application_update_preserves_shortcut_settings() {
+        let directory = TestDirectory::new("application-update");
+        let path = directory.settings_path();
+        let store = SettingsStore::load(path.clone());
+
+        store
+            .update(|settings| {
+                settings.shortcuts.play_pause = "Ctrl+Shift+P".to_string();
+            })
+            .expect("custom shortcut should persist");
+        let shortcuts = store.snapshot().shortcuts;
+
+        let updated = store
+            .update(|settings| {
+                settings.application.start_minimized = true;
+                settings.application.close_to_tray = false;
+            })
+            .expect("application settings should persist");
+
+        assert_eq!(updated.shortcuts, shortcuts);
+        assert!(updated.application.start_minimized);
+        assert!(!updated.application.close_to_tray);
+        assert_eq!(SettingsStore::load(path).snapshot(), updated);
+    }
+
+    #[test]
+    fn rejected_update_does_not_change_memory_or_disk() {
+        let directory = TestDirectory::new("rejected-update");
+        let path = directory.settings_path();
+        let store = SettingsStore::load(path.clone());
+        let expected = store.snapshot();
+
+        store
+            .replace(expected.clone())
+            .expect("defaults should persist");
+
+        let error = store
+            .update(|settings| settings.schema_version += 1)
+            .expect_err("unsupported schema update should be rejected");
+
+        assert!(error.contains("unsupported settings schema version"));
+        assert_eq!(store.snapshot(), expected);
+        assert_eq!(SettingsStore::load(path).snapshot(), expected);
+    }
+
+    #[test]
     fn recovery_resets_memory_and_disk_to_defaults() {
         let directory = TestDirectory::new("recovery");
         let path = directory.settings_path();
@@ -354,5 +434,32 @@ mod tests {
 
         assert_eq!(store.snapshot(), AppSettings::default());
         assert_eq!(SettingsStore::load(path).snapshot(), AppSettings::default());
+    }
+
+    #[test]
+    fn shortcut_recovery_preserves_application_settings() {
+        let directory = TestDirectory::new("shortcut-recovery");
+        let path = directory.settings_path();
+        let store = SettingsStore::load(path.clone());
+
+        store
+            .update(|settings| {
+                settings.application.language = crate::settings::Language::Turkish;
+                settings.application.start_minimized = true;
+                settings.shortcuts.play_pause = "Ctrl+Shift+P".to_string();
+            })
+            .expect("custom settings should persist");
+
+        store
+            .recover_shortcut_defaults()
+            .expect("shortcut defaults should persist during recovery");
+
+        let recovered = SettingsStore::load(path).snapshot();
+        assert_eq!(recovered.shortcuts, ShortcutSettings::default());
+        assert_eq!(
+            recovered.application.language,
+            crate::settings::Language::Turkish
+        );
+        assert!(recovered.application.start_minimized);
     }
 }

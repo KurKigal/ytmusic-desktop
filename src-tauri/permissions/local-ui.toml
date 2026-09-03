@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-local-ui-language-read"
+description = "Allows the trusted local Mini Player window to read the selected local UI language."
+commands.allow = ["get_local_ui_language"]

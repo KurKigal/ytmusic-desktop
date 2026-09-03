@@ -11,6 +11,7 @@
   --muted: #63676f;
   --surface: #ffffff;
   --field: #f7f7f8;
+  --switch-thumb: #ffffff;
   --error: #b3261e;
   --success: #188038;
 }
@@ -24,7 +25,7 @@ body {
   background: var(--surface);
 }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 .settings-shell {
   width: min(100%, 760px);
@@ -62,6 +63,8 @@ h1 {
   background: var(--surface);
   box-shadow: 0 1px 2px rgb(60 64 67 / 8%);
 }
+
+.settings-card + .settings-card { margin-top: 18px; }
 
 .section-heading {
   display: flex;
@@ -102,14 +105,95 @@ h1 {
   background: var(--accent-soft);
 }
 
-.secondary-button:focus-visible, .shortcut-input:focus-visible {
+.secondary-button:focus-visible,
+.select-input:focus-visible,
+.switch-input:focus-visible,
+.shortcut-input:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent);
   outline-offset: 2px;
 }
 
-.secondary-button:disabled, .shortcut-input:disabled {
+.secondary-button:disabled,
+.select-input:disabled,
+.switch-input:disabled,
+.shortcut-input:disabled {
   cursor: wait;
   opacity: 0.55;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  min-height: 68px;
+  padding: 14px 24px;
+}
+
+.setting-row + .setting-row { border-top: 1px solid var(--border); }
+
+.setting-copy { min-width: 0; }
+
+.setting-copy label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.setting-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.select-input {
+  width: 164px;
+  height: 40px;
+  padding: 7px 32px 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: inherit;
+  background: var(--field);
+  cursor: pointer;
+}
+
+.select-input:hover:not(:disabled), .select-input:focus { border-color: var(--accent); }
+
+.switch-input {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  appearance: none;
+  background: var(--field);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.switch-input::before {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: "";
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.switch-input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.switch-input:checked::before {
+  background: var(--switch-thumb);
+  transform: translateX(20px);
 }
 
 .shortcut-row {
@@ -199,6 +283,7 @@ h1 {
     --muted: #9aa0a6;
     --surface: #202124;
     --field: #292a2d;
+    --switch-thumb: #202124;
     --error: #ffb4ab;
     --success: #81c995;
   }
@@ -208,9 +293,12 @@ h1 {
   body { min-width: 320px; }
   .settings-shell { padding: 26px 18px 20px; }
   .section-heading { align-items: flex-start; padding: 18px; }
+  .setting-row { gap: 16px; padding: 14px 18px; }
+  .select-input { width: 132px; }
   .shortcut-row { grid-template-columns: 1fr; gap: 10px; padding: 14px 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .status-busy { animation: none; }
+  .switch-input, .switch-input::before { transition: none; }
 }

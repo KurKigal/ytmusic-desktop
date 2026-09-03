@@ -5,27 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="/src/styles.css" />
-    <title>YTMusic Desktop Settings</title>
+    <title>YTMusic Desktop</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
 
   <body>
     <main class="settings-shell">
       <header class="page-header">
-        <p class="eyebrow">YTMusic Desktop</p>
-        <h1>Settings</h1>
-        <p class="subtitle">Customize how the app behaves on this computer.</p>
+        <p id="product-name" class="eyebrow"></p>
+        <h1 id="settings-heading"></h1>
+        <p id="settings-subtitle" class="subtitle"></p>
       </header>
+
+      <section class="settings-card" aria-labelledby="application-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="application-heading"></h2>
+            <p id="application-description"></p>
+          </div>
+        </div>
+
+        <div id="application-list" class="application-list" aria-busy="true"></div>
+      </section>
 
       <section class="settings-card" aria-labelledby="shortcuts-heading">
         <div class="section-heading">
           <div>
-            <h2 id="shortcuts-heading">Global shortcuts</h2>
-            <p>Click a field, then press the shortcut you want to use.</p>
+            <h2 id="shortcuts-heading"></h2>
+            <p id="shortcuts-description"></p>
           </div>
-          <button id="restore-defaults" class="secondary-button" type="button">
-            Restore Defaults
-          </button>
+          <button id="restore-defaults" class="secondary-button" type="button"></button>
         </div>
 
         <div id="shortcut-list" class="shortcut-list" aria-busy="true"></div>
@@ -33,7 +42,7 @@
 
       <div class="status-area" aria-live="polite" aria-atomic="true">
         <span id="status-indicator" class="status-indicator" aria-hidden="true"></span>
-        <p id="status-message">Loading settings…</p>
+        <p id="status-message"></p>
       </div>
     </main>
   </body>

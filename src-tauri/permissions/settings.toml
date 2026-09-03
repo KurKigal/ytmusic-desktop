@@ -4,11 +4,16 @@ description = "Allows the trusted local Settings window to read application sett
 commands.allow = ["get_settings"]
 
 [[permission]]
+identifier = "allow-application-settings-update"
+description = "Allows the trusted local Settings window to update application behavior and language preferences."
+commands.allow = ["update_application_settings"]
+
+[[permission]]
 identifier = "allow-shortcut-update"
 description = "Allows the trusted local Settings window to replace one global playback shortcut."
 commands.allow = ["update_shortcut"]
 
 [[permission]]
-identifier = "allow-shortcut-restore-defaults"
-description = "Allows the trusted local Settings window to restore default global playback shortcuts."
-commands.allow = ["restore_default_shortcuts"]
+identifier = "allow-settings-restore-defaults"
+description = "Allows the trusted local Settings window to restore application and shortcut defaults."
+commands.allow = ["restore_defaults"]

@@ -1,6 +1,8 @@
 mod integrations;
+mod localization;
 mod mini_player;
 mod player;
+mod runtime_settings;
 mod settings;
 mod shortcuts;
 
@@ -10,14 +12,17 @@ use integrations::{
     setup_tray,
 };
 
+use localization::{get_local_ui_language, native_ui_strings};
 use mini_player::{
     control_mini_player, get_mini_player_state, start_mini_player_state_bridge,
     MINI_PLAYER_WINDOW_LABEL,
 };
 
 use player::{control_player, start_player_state_observer, update_player_state, PlayerStore};
+use runtime_settings::RuntimeSettings;
 use settings::{
-    get_settings, restore_default_shortcuts, update_shortcut, SettingsStore, ShortcutAction,
+    get_settings, restore_defaults, update_application_settings, update_shortcut, SettingsStore,
+    ShortcutAction,
 };
 use shortcuts::{validate_shortcut_settings, ShortcutManager};
 
@@ -36,8 +41,10 @@ pub fn run() {
             update_player_state,
             control_player,
             get_settings,
+            update_application_settings,
             update_shortcut,
-            restore_default_shortcuts,
+            restore_defaults,
+            get_local_ui_language,
             get_mini_player_state,
             control_mini_player,
         ])
@@ -54,11 +61,12 @@ pub fn run() {
                     "[settings] loaded shortcut settings are invalid; using defaults: {error}"
                 );
 
-                if let Err(error) = settings_store.recover_defaults() {
-                    eprintln!("[settings] failed to persist recovered defaults: {error}");
+                if let Err(error) = settings_store.recover_shortcut_defaults() {
+                    eprintln!("[settings] failed to persist recovered shortcut defaults: {error}");
                 }
             }
 
+            let initial_settings = settings_store.snapshot();
             app.manage(settings_store);
             app.manage(ShortcutManager::default());
 
@@ -66,7 +74,13 @@ pub fn run() {
 
             // Subscribe before the WebView starts publishing
             // player snapshots.
-            setup_discord_presence(app);
+            let discord = setup_discord_presence(
+                app,
+                initial_settings.application.discord_rich_presence_enabled,
+            );
+            app.manage(RuntimeSettings::new(discord));
+
+            let native_strings = native_ui_strings(initial_settings.application.language);
 
             let url = "https://music.youtube.com"
                 .parse()
@@ -78,6 +92,7 @@ pub fn run() {
                 .min_inner_size(900.0, 600.0)
                 .center()
                 .resizable(true)
+                .visible(!initial_settings.application.start_minimized)
                 .devtools(true)
                 .initialization_script(YTMUSIC_INIT_SCRIPT)
                 .build()?;
@@ -86,7 +101,7 @@ pub fn run() {
 
             let settings_window =
                 WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
-                    .title("YTMusic Desktop Settings")
+                    .title(native_strings.settings_window_title)
                     .inner_size(760.0, 700.0)
                     .min_inner_size(520.0, 480.0)
                     .center()
@@ -101,12 +116,13 @@ pub fn run() {
                 MINI_PLAYER_WINDOW_LABEL,
                 WebviewUrl::App("mini-player.html".into()),
             )
-            .title("YTMusic Desktop Mini Player")
+            .title(native_strings.mini_player_window_title)
             .inner_size(460.0, 220.0)
             .min_inner_size(400.0, 200.0)
             .max_inner_size(640.0, 320.0)
             .center()
             .resizable(true)
+            .always_on_top(initial_settings.application.mini_player_always_on_top)
             .visible(false)
             .build()?;
 
@@ -115,12 +131,11 @@ pub fn run() {
             setup_native_media_controls(app, &main_window);
             start_mini_player_state_bridge(app);
 
-            setup_tray(app)?;
+            setup_tray(app, initial_settings.application.language)?;
 
-            let app_settings = app.state::<SettingsStore>().snapshot();
             let report = app
                 .state::<ShortcutManager>()
-                .register_startup(app.handle(), &app_settings.shortcuts);
+                .register_startup(app.handle(), &initial_settings.shortcuts);
 
             for failure in report.failures {
                 eprintln!(

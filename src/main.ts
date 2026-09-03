@@ -1,14 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 
-const SHORTCUT_ACTIONS = [
-  { id: "playPause", label: "Play / Pause", description: "Toggle playback" },
-  { id: "next", label: "Next", description: "Play the next track" },
-  { id: "previous", label: "Previous", description: "Play the previous track" },
-  { id: "seekForward10", label: "Seek Forward 10s", description: "Skip ahead ten seconds" },
-  { id: "seekBackward10", label: "Seek Backward 10s", description: "Skip back ten seconds" },
-] as const;
-
-type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number]["id"];
+import {
+  LANGUAGES,
+  SHORTCUT_ACTION_IDS,
+  isLanguage,
+  translations,
+  type Language,
+  type ShortcutAction,
+  type TranslationDictionary,
+} from "./i18n";
 
 interface ShortcutSettings {
   playPause: string;
@@ -18,23 +18,70 @@ interface ShortcutSettings {
   seekBackward10: string;
 }
 
+interface ApplicationSettings {
+  language: Language;
+  discordRichPresenceEnabled: boolean;
+  closeToTray: boolean;
+  startMinimized: boolean;
+  miniPlayerAlwaysOnTop: boolean;
+}
+
 interface AppSettings {
+  schemaVersion: number;
+  application: ApplicationSettings;
   shortcuts: ShortcutSettings;
 }
 
+type BooleanApplicationSetting = Exclude<keyof ApplicationSettings, "language">;
+type LocalizedText = (dictionary: TranslationDictionary) => string;
+type StatusKind = "neutral" | "busy" | "success" | "error";
+
 interface ShortcutElements {
   input: HTMLInputElement;
+  label: HTMLLabelElement;
+  description: HTMLParagraphElement;
   error: HTMLParagraphElement;
+  errorText: LocalizedText | null;
 }
 
+interface SwitchElements {
+  input: HTMLInputElement;
+  label: HTMLLabelElement;
+  description: HTMLParagraphElement;
+}
+
+const APPLICATION_SWITCHES = [
+  "discordRichPresenceEnabled",
+  "closeToTray",
+  "startMinimized",
+  "miniPlayerAlwaysOnTop",
+] as const satisfies readonly BooleanApplicationSetting[];
+
 const shortcutElements = new Map<ShortcutAction, ShortcutElements>();
+const switchElements = new Map<BooleanApplicationSetting, SwitchElements>();
 let settings: AppSettings | null = null;
 let pendingAction: ShortcutAction | null = null;
+let applicationUpdatePending = false;
+let currentLanguage: Language = "en";
+let currentStatusText: LocalizedText = (dictionary) => dictionary.settings.status.loading;
+let currentStatusKind: StatusKind = "busy";
 
+const productName = requireElement<HTMLParagraphElement>("#product-name");
+const settingsHeading = requireElement<HTMLHeadingElement>("#settings-heading");
+const settingsSubtitle = requireElement<HTMLParagraphElement>("#settings-subtitle");
+const applicationHeading = requireElement<HTMLHeadingElement>("#application-heading");
+const applicationDescription = requireElement<HTMLParagraphElement>("#application-description");
+const applicationList = requireElement<HTMLDivElement>("#application-list");
+const shortcutsHeading = requireElement<HTMLHeadingElement>("#shortcuts-heading");
+const shortcutsDescription = requireElement<HTMLParagraphElement>("#shortcuts-description");
 const shortcutList = requireElement<HTMLDivElement>("#shortcut-list");
 const restoreButton = requireElement<HTMLButtonElement>("#restore-defaults");
 const statusMessage = requireElement<HTMLParagraphElement>("#status-message");
 const statusIndicator = requireElement<HTMLSpanElement>("#status-indicator");
+
+let languageSelect: HTMLSelectElement;
+let languageLabel: HTMLLabelElement;
+let languageDescription: HTMLParagraphElement;
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -42,40 +89,104 @@ function requireElement<T extends Element>(selector: string): T {
   return element;
 }
 
+function dictionary(): TranslationDictionary {
+  return translations[currentLanguage];
+}
+
+function renderApplicationFields(): void {
+  const languageRow = document.createElement("div");
+  languageRow.className = "setting-row";
+
+  const languageCopy = document.createElement("div");
+  languageCopy.className = "setting-copy";
+  languageLabel = document.createElement("label");
+  languageLabel.htmlFor = "application-language";
+  languageDescription = document.createElement("p");
+  languageDescription.id = "application-language-description";
+  languageCopy.append(languageLabel, languageDescription);
+
+  languageSelect = document.createElement("select");
+  languageSelect.id = "application-language";
+  languageSelect.className = "select-input";
+  languageSelect.setAttribute("aria-describedby", languageDescription.id);
+  for (const language of LANGUAGES) {
+    const option = document.createElement("option");
+    option.value = language;
+    languageSelect.append(option);
+  }
+  languageSelect.addEventListener("change", () => {
+    if (isLanguage(languageSelect.value)) {
+      void updateApplicationSetting("language", languageSelect.value);
+    }
+  });
+
+  languageRow.append(languageCopy, languageSelect);
+  applicationList.append(languageRow);
+
+  for (const setting of APPLICATION_SWITCHES) {
+    const row = document.createElement("div");
+    row.className = "setting-row";
+
+    const copy = document.createElement("div");
+    copy.className = "setting-copy";
+    const label = document.createElement("label");
+    label.htmlFor = `application-${setting}`;
+    const description = document.createElement("p");
+    description.id = `application-${setting}-description`;
+    copy.append(label, description);
+
+    const input = document.createElement("input");
+    input.id = `application-${setting}`;
+    input.className = "switch-input";
+    input.type = "checkbox";
+    input.setAttribute("role", "switch");
+    input.setAttribute("aria-describedby", description.id);
+    input.addEventListener("change", () => {
+      void updateApplicationSetting(setting, input.checked);
+    });
+
+    row.append(copy, input);
+    applicationList.append(row);
+    switchElements.set(setting, { input, label, description });
+  }
+}
+
 function renderShortcutFields(): void {
-  for (const action of SHORTCUT_ACTIONS) {
+  for (const action of SHORTCUT_ACTION_IDS) {
     const row = document.createElement("div");
     row.className = "shortcut-row";
 
     const copy = document.createElement("div");
     copy.className = "shortcut-copy";
     const label = document.createElement("label");
-    label.htmlFor = `shortcut-${action.id}`;
-    label.textContent = action.label;
+    label.htmlFor = `shortcut-${action}`;
     const description = document.createElement("p");
-    description.textContent = action.description;
 
     const control = document.createElement("div");
     control.className = "shortcut-control";
     const input = document.createElement("input");
-    input.id = `shortcut-${action.id}`;
+    input.id = `shortcut-${action}`;
     input.className = "shortcut-input";
     input.type = "text";
     input.readOnly = true;
     input.autocomplete = "off";
     input.spellcheck = false;
-    input.placeholder = "Press shortcut";
-    input.setAttribute("aria-describedby", `shortcut-error-${action.id}`);
-    input.setAttribute("aria-label", `${action.label} shortcut`);
-    input.addEventListener("keydown", (event) => void captureShortcut(action.id, event));
+    input.setAttribute("aria-describedby", `shortcut-error-${action}`);
+    input.addEventListener("keydown", (event) => void captureShortcut(action, event));
     input.addEventListener("focus", () => {
-      if (pendingAction === null) {
-        setStatus(`Press a key combination for ${action.label}.`, "neutral");
+      if (pendingAction === null && !applicationUpdatePending) {
+        setStatus(
+          (nextDictionary) =>
+            nextDictionary.settings.status.pressCombination(
+              nextDictionary.settings.shortcuts.actions[action].label,
+            ),
+          "neutral",
+        );
       }
     });
 
     const error = document.createElement("p");
-    error.id = `shortcut-error-${action.id}`;
+    error.id = `shortcut-error-${action}`;
     error.className = "field-error";
     error.setAttribute("role", "alert");
 
@@ -83,44 +194,132 @@ function renderShortcutFields(): void {
     control.append(input, error);
     row.append(copy, control);
     shortcutList.append(row);
-    shortcutElements.set(action.id, { input, error });
+    shortcutElements.set(action, { input, label, description, error, errorText: null });
   }
+}
+
+function applyLanguage(language: Language): void {
+  currentLanguage = language;
+  const copy = dictionary();
+  const settingsCopy = copy.settings;
+
+  document.documentElement.lang = language;
+  document.title = settingsCopy.windowTitle;
+  productName.textContent = copy.common.productName;
+  settingsHeading.textContent = settingsCopy.heading;
+  settingsSubtitle.textContent = settingsCopy.subtitle;
+  applicationHeading.textContent = settingsCopy.application.heading;
+  applicationDescription.textContent = settingsCopy.application.description;
+  shortcutsHeading.textContent = settingsCopy.shortcuts.heading;
+  shortcutsDescription.textContent = settingsCopy.shortcuts.description;
+  restoreButton.textContent = settingsCopy.shortcuts.restoreDefaults;
+
+  languageLabel.textContent = settingsCopy.application.language.label;
+  languageDescription.textContent = settingsCopy.application.language.description;
+  for (const [index, languageCode] of LANGUAGES.entries()) {
+    languageSelect.options[index].textContent =
+      settingsCopy.application.languageOptions[languageCode];
+  }
+
+  for (const setting of APPLICATION_SWITCHES) {
+    const elements = switchElements.get(setting);
+    if (!elements) continue;
+    const translatedSetting = settingsCopy.application[setting];
+    elements.label.textContent = translatedSetting.label;
+    elements.description.textContent = translatedSetting.description;
+    elements.input.setAttribute("aria-label", translatedSetting.label);
+  }
+
+  for (const action of SHORTCUT_ACTION_IDS) {
+    const elements = shortcutElements.get(action);
+    if (!elements) continue;
+    const translatedAction = settingsCopy.shortcuts.actions[action];
+    elements.label.textContent = translatedAction.label;
+    elements.description.textContent = translatedAction.description;
+    elements.input.placeholder = settingsCopy.shortcuts.pressShortcut;
+    elements.input.setAttribute(
+      "aria-label",
+      settingsCopy.shortcuts.inputAriaLabel(translatedAction.label),
+    );
+    renderFieldError(elements);
+  }
+
+  renderStatus();
 }
 
 async function loadSettings(): Promise<void> {
   setControlsDisabled(true);
-  setStatus("Loading settings…", "busy");
+  setStatus((copy) => copy.settings.status.loading, "busy");
   try {
     settings = await invoke<AppSettings>("get_settings");
+    applyLanguage(isLanguage(settings.application.language) ? settings.application.language : "en");
     displaySettings(settings);
     setControlsDisabled(false);
-    setStatus("Settings are up to date.", "success");
+    setStatus((copy) => copy.settings.status.ready, "success");
   } catch (error: unknown) {
-    setStatus(`Could not load settings: ${formatError(error)}`, "error");
+    const detail = formatError(error);
+    setStatus((copy) => copy.settings.status.loadFailed(detail), "error");
   } finally {
+    applicationList.setAttribute("aria-busy", "false");
     shortcutList.setAttribute("aria-busy", "false");
+  }
+}
+
+async function updateApplicationSetting<K extends keyof ApplicationSettings>(
+  key: K,
+  value: ApplicationSettings[K],
+): Promise<void> {
+  if (!settings || pendingAction !== null || applicationUpdatePending) {
+    if (settings) displayApplicationSettings(settings.application);
+    return;
+  }
+
+  const previous = settings.application;
+  const application = { ...previous, [key]: value };
+  if (key === "language" && isLanguage(value)) applyLanguage(value);
+
+  applicationUpdatePending = true;
+  clearFieldErrors();
+  displayApplicationSettings(application);
+  setControlsDisabled(true);
+  setStatus((copy) => copy.settings.status.savingApplication, "busy");
+
+  try {
+    const updated = await invoke<AppSettings>("update_application_settings", { application });
+    settings = updated;
+    applyLanguage(isLanguage(updated.application.language) ? updated.application.language : "en");
+    displaySettings(updated);
+    setStatus((copy) => copy.settings.status.applicationSaved, "success");
+  } catch (error: unknown) {
+    applyLanguage(previous.language);
+    displayApplicationSettings(previous);
+    const detail = formatError(error);
+    setStatus((copy) => copy.settings.status.applicationFailed(detail), "error");
+  } finally {
+    applicationUpdatePending = false;
+    setControlsDisabled(false);
   }
 }
 
 async function captureShortcut(action: ShortcutAction, event: KeyboardEvent): Promise<void> {
   event.preventDefault();
   event.stopPropagation();
-  if (event.repeat || pendingAction !== null) return;
+  if (event.repeat || pendingAction !== null || applicationUpdatePending) return;
 
   if (event.key === "Escape") {
     shortcutElements.get(action)?.input.blur();
-    setFieldError(action, "");
-    setStatus("Shortcut change cancelled.", "neutral");
+    setFieldError(action, null);
+    setStatus((copy) => copy.settings.status.changeCancelled, "neutral");
     return;
   }
 
   const shortcut = shortcutFromKeyboardEvent(event);
   if (!shortcut) {
-    setFieldError(action, "Press a non-modifier key with any modifiers you want.");
+    setFieldError(action, (copy) => copy.settings.status.modifierOnly);
     return;
   }
   if (!settings) {
-    setFieldError(action, "Settings are not available yet.");
+    setFieldError(action, (copy) => copy.settings.status.unavailable);
     return;
   }
 
@@ -128,39 +327,44 @@ async function captureShortcut(action: ShortcutAction, event: KeyboardEvent): Pr
   const elements = shortcutElements.get(action);
   if (!elements) return;
   if (shortcutIdentity(shortcut) === shortcutIdentity(previousShortcut)) {
-    setFieldError(action, "");
-    setStatus("Shortcut is unchanged.", "neutral");
+    setFieldError(action, null);
+    setStatus((copy) => copy.settings.status.unchanged, "neutral");
     elements.input.blur();
     return;
   }
 
-  const duplicate = SHORTCUT_ACTIONS.find(
+  const duplicate = SHORTCUT_ACTION_IDS.find(
     (candidate) =>
-      candidate.id !== action &&
-      shortcutIdentity(settings?.shortcuts[candidate.id] ?? "") === shortcutIdentity(shortcut),
+      candidate !== action &&
+      shortcutIdentity(settings?.shortcuts[candidate] ?? "") === shortcutIdentity(shortcut),
   );
   if (duplicate) {
-    setFieldError(action, `${shortcut} is already assigned to ${duplicate.label}.`);
-    setStatus("Each action needs a unique shortcut.", "error");
+    setFieldError(action, (copy) =>
+      copy.settings.status.duplicate(
+        shortcut,
+        copy.settings.shortcuts.actions[duplicate].label,
+      ),
+    );
+    setStatus((copy) => copy.settings.status.uniqueRequired, "error");
     return;
   }
 
   pendingAction = action;
-  setFieldError(action, "");
+  setFieldError(action, null);
   elements.input.value = shortcut;
   setControlsDisabled(true);
-  setStatus(`Applying ${shortcut}…`, "busy");
+  setStatus((copy) => copy.settings.status.applyingShortcut(shortcut), "busy");
 
   try {
     const updated = await invoke<AppSettings>("update_shortcut", { action, shortcut });
     settings = updated;
     displaySettings(updated);
-    setStatus(`${shortcut} is ready to use.`, "success");
+    setStatus((copy) => copy.settings.status.shortcutApplied(shortcut), "success");
   } catch (error: unknown) {
     elements.input.value = previousShortcut;
-    const message = formatError(error);
-    setFieldError(action, message);
-    setStatus(`Could not change the shortcut: ${message}`, "error");
+    const detail = formatError(error);
+    setFieldError(action, () => detail);
+    setStatus((copy) => copy.settings.status.shortcutFailed(detail), "error");
   } finally {
     pendingAction = null;
     setControlsDisabled(false);
@@ -170,17 +374,19 @@ async function captureShortcut(action: ShortcutAction, event: KeyboardEvent): Pr
 }
 
 async function restoreDefaults(): Promise<void> {
-  if (pendingAction !== null) return;
+  if (pendingAction !== null || applicationUpdatePending) return;
   clearFieldErrors();
   setControlsDisabled(true);
-  setStatus("Restoring default shortcuts…", "busy");
+  setStatus((copy) => copy.settings.status.restoringDefaults, "busy");
   try {
-    const updated = await invoke<AppSettings>("restore_default_shortcuts");
+    const updated = await invoke<AppSettings>("restore_defaults");
     settings = updated;
+    applyLanguage(isLanguage(updated.application.language) ? updated.application.language : "en");
     displaySettings(updated);
-    setStatus("Default shortcuts restored.", "success");
+    setStatus((copy) => copy.settings.status.defaultsRestored, "success");
   } catch (error: unknown) {
-    setStatus(`Could not restore defaults: ${formatError(error)}`, "error");
+    const detail = formatError(error);
+    setStatus((copy) => copy.settings.status.restoreFailed(detail), "error");
   } finally {
     setControlsDisabled(false);
   }
@@ -268,32 +474,55 @@ function shortcutIdentity(shortcut: string): string {
 }
 
 function displaySettings(nextSettings: AppSettings): void {
-  for (const action of SHORTCUT_ACTIONS) {
-    const elements = shortcutElements.get(action.id);
-    if (elements) elements.input.value = nextSettings.shortcuts[action.id];
+  displayApplicationSettings(nextSettings.application);
+  for (const action of SHORTCUT_ACTION_IDS) {
+    const elements = shortcutElements.get(action);
+    if (elements) elements.input.value = nextSettings.shortcuts[action];
+  }
+}
+
+function displayApplicationSettings(application: ApplicationSettings): void {
+  languageSelect.value = application.language;
+  for (const setting of APPLICATION_SWITCHES) {
+    const elements = switchElements.get(setting);
+    if (elements) elements.input.checked = application[setting];
   }
 }
 
 function setControlsDisabled(disabled: boolean): void {
   restoreButton.disabled = disabled;
+  languageSelect.disabled = disabled;
+  for (const { input } of switchElements.values()) input.disabled = disabled;
   for (const { input } of shortcutElements.values()) input.disabled = disabled;
 }
 
 function clearFieldErrors(): void {
-  for (const action of SHORTCUT_ACTIONS) setFieldError(action.id, "");
+  for (const action of SHORTCUT_ACTION_IDS) setFieldError(action, null);
 }
 
-function setFieldError(action: ShortcutAction, message: string): void {
+function setFieldError(action: ShortcutAction, message: LocalizedText | null): void {
   const elements = shortcutElements.get(action);
   if (!elements) return;
+  elements.errorText = message;
+  renderFieldError(elements);
+}
+
+function renderFieldError(elements: ShortcutElements): void {
+  const message = elements.errorText?.(dictionary()) ?? "";
   elements.error.textContent = message;
   elements.input.classList.toggle("has-error", message.length > 0);
   elements.input.setAttribute("aria-invalid", String(message.length > 0));
 }
 
-function setStatus(message: string, kind: "neutral" | "busy" | "success" | "error"): void {
-  statusMessage.textContent = message;
-  statusIndicator.className = `status-indicator status-${kind}`;
+function setStatus(message: LocalizedText, kind: StatusKind): void {
+  currentStatusText = message;
+  currentStatusKind = kind;
+  renderStatus();
+}
+
+function renderStatus(): void {
+  statusMessage.textContent = currentStatusText(dictionary());
+  statusIndicator.className = `status-indicator status-${currentStatusKind}`;
 }
 
 function formatError(error: unknown): string {
@@ -302,9 +531,11 @@ function formatError(error: unknown): string {
   if (typeof error === "object" && error !== null && "message" in error) {
     return String(error.message);
   }
-  return "An unexpected error occurred.";
+  return dictionary().common.unexpectedError;
 }
 
+renderApplicationFields();
 renderShortcutFields();
+applyLanguage(currentLanguage);
 restoreButton.addEventListener("click", () => void restoreDefaults());
 void loadSettings();
