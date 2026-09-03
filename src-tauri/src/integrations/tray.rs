@@ -4,13 +4,19 @@ use tauri::{
     App, AppHandle, Manager,
 };
 
-use crate::player::{dispatch_player_command, PlayerCommand};
+use crate::{
+    mini_player::MINI_PLAYER_WINDOW_LABEL,
+    player::{dispatch_player_command, PlayerCommand},
+};
 
 /// Creates the native system tray icon and menu.
 pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
     let open_item = MenuItem::with_id(app, "open", "Open YTMusic Desktop", true, None::<&str>)?;
 
     let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+
+    let mini_player_item =
+        MenuItem::with_id(app, "mini_player", "Mini Player", true, None::<&str>)?;
 
     let play_pause_item = MenuItem::with_id(app, "play_pause", "Play / Pause", true, None::<&str>)?;
 
@@ -29,6 +35,7 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
         &[
             &open_item,
             &settings_item,
+            &mini_player_item,
             &separator_one,
             &play_pause_item,
             &previous_item,
@@ -53,6 +60,12 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
             "settings" => {
                 if let Err(error) = show_settings_window(app) {
                     eprintln!("[tray] failed to show settings window: {error}");
+                }
+            }
+
+            "mini_player" => {
+                if let Err(error) = show_mini_player_window(app) {
+                    eprintln!("[tray] failed to show mini player window: {error}");
                 }
             }
 
@@ -139,6 +152,26 @@ fn show_settings_window(app: &AppHandle) -> Result<(), String> {
     window
         .set_focus()
         .map_err(|error| format!("failed to focus settings window: {error}"))?;
+
+    Ok(())
+}
+
+fn show_mini_player_window(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window(MINI_PLAYER_WINDOW_LABEL)
+        .ok_or_else(|| "mini player webview window not found".to_string())?;
+
+    window
+        .unminimize()
+        .map_err(|error| format!("failed to unminimize mini player window: {error}"))?;
+
+    window
+        .show()
+        .map_err(|error| format!("failed to show mini player window: {error}"))?;
+
+    window
+        .set_focus()
+        .map_err(|error| format!("failed to focus mini player window: {error}"))?;
 
     Ok(())
 }

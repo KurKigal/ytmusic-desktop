@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-mini-player-state-read"
+description = "Allows the trusted local Mini Player window to read the current playback state."
+commands.allow = ["get_mini_player_state"]
+
+[[permission]]
+identifier = "allow-mini-player-control"
+description = "Allows the trusted local Mini Player window to control playback through the Rust player API."
+commands.allow = ["control_mini_player"]

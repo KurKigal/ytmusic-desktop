@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="/src/mini-player.css" />
+    <title>YTMusic Desktop Mini Player</title>
+    <script type="module" src="/src/mini-player.ts" defer></script>
+  </head>
+
+  <body>
+    <main class="mini-player" aria-label="YTMusic Desktop mini player">
+      <div class="artwork-frame">
+        <img id="artwork" class="artwork" alt="" hidden />
+        <div id="artwork-placeholder" class="artwork-placeholder" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M9 18V5l10-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="16" cy="16" r="3" />
+          </svg>
+        </div>
+      </div>
+
+      <section class="player-content" aria-labelledby="track-title">
+        <header class="track-copy">
+          <h1 id="track-title">Waiting for playback</h1>
+          <p id="track-artist">Start playing music in YouTube Music</p>
+        </header>
+
+        <div class="controls" aria-label="Playback controls">
+          <button
+            id="previous"
+            class="control-button"
+            type="button"
+            aria-label="Previous track"
+            title="Previous track"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M6 5h2v14H6zm3.5 7L18 5v14z" />
+            </svg>
+          </button>
+
+          <button
+            id="play-pause"
+            class="control-button primary-control"
+            type="button"
+            aria-label="Play"
+            disabled
+          >
+            <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m8 5 11 7-11 7z" />
+            </svg>
+            <svg id="pause-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" hidden>
+              <path d="M7 5h4v14H7zm6 0h4v14h-4z" />
+            </svg>
+          </button>
+
+          <button
+            id="next"
+            class="control-button"
+            type="button"
+            aria-label="Next track"
+            title="Next track"
+            disabled
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="m6 5 8.5 7L6 19zm10 0h2v14h-2z" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="timeline">
+          <span id="elapsed" class="time-label">0:00</span>
+          <input
+            id="progress"
+            class="progress"
+            type="range"
+            min="0"
+            max="0"
+            step="1"
+            value="0"
+            aria-label="Track position"
+            aria-valuetext="0:00 of 0:00"
+            disabled
+          />
+          <span id="duration" class="time-label">0:00</span>
+        </div>
+
+        <p id="notice" class="notice" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+  </body>
+</html>

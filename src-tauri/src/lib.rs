@@ -1,11 +1,18 @@
 mod integrations;
+mod mini_player;
 mod player;
 mod settings;
 mod shortcuts;
 
 use integrations::{
-    configure_windows_identity, install_close_to_tray, install_settings_close_handler,
-    setup_discord_presence, setup_native_media_controls, setup_tray,
+    configure_windows_identity, install_close_to_tray, install_mini_player_close_handler,
+    install_settings_close_handler, setup_discord_presence, setup_native_media_controls,
+    setup_tray,
+};
+
+use mini_player::{
+    control_mini_player, get_mini_player_state, start_mini_player_state_bridge,
+    MINI_PLAYER_WINDOW_LABEL,
 };
 
 use player::{control_player, start_player_state_observer, update_player_state, PlayerStore};
@@ -31,6 +38,8 @@ pub fn run() {
             get_settings,
             update_shortcut,
             restore_default_shortcuts,
+            get_mini_player_state,
+            control_mini_player,
         ])
         .setup(|app| {
             let settings_path = app.path().app_config_dir()?.join("settings.json");
@@ -87,7 +96,24 @@ pub fn run() {
 
             install_settings_close_handler(&settings_window);
 
+            let mini_player_window = WebviewWindowBuilder::new(
+                app,
+                MINI_PLAYER_WINDOW_LABEL,
+                WebviewUrl::App("mini-player.html".into()),
+            )
+            .title("YTMusic Desktop Mini Player")
+            .inner_size(460.0, 220.0)
+            .min_inner_size(400.0, 200.0)
+            .max_inner_size(640.0, 320.0)
+            .center()
+            .resizable(true)
+            .visible(false)
+            .build()?;
+
+            install_mini_player_close_handler(&mini_player_window);
+
             setup_native_media_controls(app, &main_window);
+            start_mini_player_state_bridge(app);
 
             setup_tray(app)?;
 
