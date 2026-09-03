@@ -2,42 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <title>YTMusic Desktop Settings</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
 
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+    <main class="settings-shell">
+      <header class="page-header">
+        <p class="eyebrow">YTMusic Desktop</p>
+        <h1>Settings</h1>
+        <p class="subtitle">Customize how the app behaves on this computer.</p>
+      </header>
 
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
+      <section class="settings-card" aria-labelledby="shortcuts-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="shortcuts-heading">Global shortcuts</h2>
+            <p>Click a field, then press the shortcut you want to use.</p>
+          </div>
+          <button id="restore-defaults" class="secondary-button" type="button">
+            Restore Defaults
+          </button>
+        </div>
+
+        <div id="shortcut-list" class="shortcut-list" aria-busy="true"></div>
+      </section>
+
+      <div class="status-area" aria-live="polite" aria-atomic="true">
+        <span id="status-indicator" class="status-indicator" aria-hidden="true"></span>
+        <p id="status-message">Loading settings…</p>
       </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
-
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
     </main>
   </body>
 </html>

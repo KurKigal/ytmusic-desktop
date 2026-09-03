@@ -21,3 +21,19 @@ pub fn install_close_to_tray(window: &WebviewWindow) {
         }
     });
 }
+
+/// Keeps the local settings WebView available for reuse when its
+/// native close button is pressed.
+pub fn install_settings_close_handler(window: &WebviewWindow) {
+    let window_for_event = window.clone();
+
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+
+            if let Err(error) = window_for_event.hide() {
+                eprintln!("[window] failed to hide settings window: {error}");
+            }
+        }
+    });
+}

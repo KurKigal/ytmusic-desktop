@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings-window",
+  "description": "Allows the trusted local Settings window to read settings and update global shortcuts.",
+  "windows": ["settings"],
+  "permissions": [
+    "allow-settings-read",
+    "allow-shortcut-update",
+    "allow-shortcut-restore-defaults"
+  ]
+}

@@ -10,6 +10,8 @@ use crate::player::{dispatch_player_command, PlayerCommand};
 pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
     let open_item = MenuItem::with_id(app, "open", "Open YTMusic Desktop", true, None::<&str>)?;
 
+    let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+
     let play_pause_item = MenuItem::with_id(app, "play_pause", "Play / Pause", true, None::<&str>)?;
 
     let previous_item = MenuItem::with_id(app, "previous", "Previous", true, None::<&str>)?;
@@ -26,6 +28,7 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
         app,
         &[
             &open_item,
+            &settings_item,
             &separator_one,
             &play_pause_item,
             &previous_item,
@@ -44,6 +47,12 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
             "open" => {
                 if let Err(error) = show_main_window(app) {
                     eprintln!("[tray] failed to show main window: {error}");
+                }
+            }
+
+            "settings" => {
+                if let Err(error) = show_settings_window(app) {
+                    eprintln!("[tray] failed to show settings window: {error}");
                 }
             }
 
@@ -110,6 +119,26 @@ fn show_main_window(app: &AppHandle) -> Result<(), String> {
     window
         .set_focus()
         .map_err(|error| format!("failed to focus window: {error}"))?;
+
+    Ok(())
+}
+
+fn show_settings_window(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("settings")
+        .ok_or_else(|| "settings webview window not found".to_string())?;
+
+    window
+        .unminimize()
+        .map_err(|error| format!("failed to unminimize settings window: {error}"))?;
+
+    window
+        .show()
+        .map_err(|error| format!("failed to show settings window: {error}"))?;
+
+    window
+        .set_focus()
+        .map_err(|error| format!("failed to focus settings window: {error}"))?;
 
     Ok(())
 }
