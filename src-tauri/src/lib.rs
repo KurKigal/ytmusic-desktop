@@ -93,7 +93,7 @@ pub fn run() {
                 .center()
                 .resizable(true)
                 .visible(!initial_settings.application.start_minimized)
-                .devtools(true)
+                .devtools(cfg!(debug_assertions))
                 .initialization_script(YTMUSIC_INIT_SCRIPT)
                 .build()?;
 
