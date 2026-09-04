@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/KurKigal/ytmusic-desktop/releases/tag/v0.1.0-rc.1"><strong>Download</strong></a>
+  <a href="https://github.com/KurKigal/ytmusic-desktop/releases/tag/v0.1.0"><strong>Download</strong></a>
   ·
   <a href="https://github.com/KurKigal/ytmusic-desktop/releases">Releases</a>
   ·
@@ -165,19 +165,19 @@ This localization applies to YTMusic Desktop's own Settings, Mini Player and nat
 
 The current public build is:
 
-**v0.1.0-rc.1**
+**v0.1.0**
 
 ### Recommended
 
 **NSIS installer**
 
-[Download YTMusic.Desktop_0.1.0_x64-setup.exe](https://github.com/KurKigal/ytmusic-desktop/releases/download/v0.1.0-rc.1/YTMusic.Desktop_0.1.0_x64-setup.exe)
+[Download YTMusic.Desktop_0.1.0_x64-setup.exe](https://github.com/KurKigal/ytmusic-desktop/releases/download/v0.1.0/YTMusic.Desktop_0.1.0_x64-setup.exe)
 
 ### Alternative
 
 **MSI installer**
 
-[Download YTMusic.Desktop_0.1.0_x64_en-US.msi](https://github.com/KurKigal/ytmusic-desktop/releases/download/v0.1.0-rc.1/YTMusic.Desktop_0.1.0_x64_en-US.msi)
+[Download YTMusic.Desktop_0.1.0_x64_en-US.msi](https://github.com/KurKigal/ytmusic-desktop/releases/download/v0.1.0/YTMusic.Desktop_0.1.0_x64_en-US.msi)
 
 All releases are available on the [Releases page](https://github.com/KurKigal/ytmusic-desktop/releases).
 
@@ -319,8 +319,8 @@ ytmusic-desktop/
 │   │   └── app-icon.png
 │   └── screenshots/
 │       ├── main-page.png
-│       ├── settings-en.png
-│       ├── settings-tr.png
+│       ├── en-settings.png
+│       ├── tr-ayarlar.png
 │       ├── mini-player-en.png
 │       └── mini-player-tr.png
 ├── src/
@@ -356,9 +356,9 @@ ytmusic-desktop/
 
 ## Current status
 
-YTMusic Desktop is currently in its first public release-candidate stage:
+YTMusic Desktop is currently available as its first stable public release:
 
-**v0.1.0-rc.1**
+**v0.1.0**
 
 The core desktop experience is implemented and has been manually validated on Windows, including:
 
@@ -373,8 +373,6 @@ The core desktop experience is implemented and has been manually validated on Wi
 - English / Turkish local UI
 - Windows application identity
 - NSIS and MSI installation
-
-The remaining work before the stable `v0.1.0` release is focused on final production validation and release preparation.
 
 ## Known limitations
 
