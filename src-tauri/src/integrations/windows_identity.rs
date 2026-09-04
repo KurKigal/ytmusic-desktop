@@ -1,7 +1,7 @@
 #[cfg(windows)]
 use windows::{core::HSTRING, Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID};
 
-const APP_USER_MODEL_ID: &str = "KurKigal.YTMusicDesktop";
+const APP_USER_MODEL_ID: &str = "com.emirhankeser.ytmdesktop";
 
 pub fn configure_windows_identity() {
     #[cfg(windows)]
