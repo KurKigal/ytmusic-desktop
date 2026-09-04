@@ -54,10 +54,10 @@ Native features are coordinated through a Rust core and a deliberately narrow br
   </tr>
   <tr>
     <td>
-      <img src="assets/screenshots/settings-en.png" alt="YTMusic Desktop settings in English">
+      <img src="assets/screenshots/en-settings.png" alt="YTMusic Desktop settings in English">
     </td>
     <td>
-      <img src="assets/screenshots/settings-tr.png" alt="YTMusic Desktop settings in Turkish">
+      <img src="assets/screenshots/tr-settings.png" alt="YTMusic Desktop settings in Turkish">
     </td>
   </tr>
 </table>
