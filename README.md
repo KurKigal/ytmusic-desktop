@@ -37,6 +37,48 @@ The application keeps YouTube Music responsible for playback and streaming. It d
 
 Native features are coordinated through a Rust core and a deliberately narrow bridge between the remote YouTube Music WebView and the trusted desktop application.
 
+## Screenshots
+
+### Main window
+
+<p align="center">
+  <img src="assets/screenshots/main-page.png" alt="YTMusic Desktop main window" width="900">
+</p>
+
+### Settings
+
+<table>
+  <tr>
+    <td align="center"><strong>English</strong></td>
+    <td align="center"><strong>Türkçe</strong></td>
+  </tr>
+  <tr>
+    <td>
+      <img src="assets/screenshots/settings-en.png" alt="YTMusic Desktop settings in English">
+    </td>
+    <td>
+      <img src="assets/screenshots/settings-tr.png" alt="YTMusic Desktop settings in Turkish">
+    </td>
+  </tr>
+</table>
+
+### Mini Player
+
+<table>
+  <tr>
+    <td align="center"><strong>English</strong></td>
+    <td align="center"><strong>Türkçe</strong></td>
+  </tr>
+  <tr>
+    <td>
+      <img src="assets/screenshots/mini-player-en.png" alt="YTMusic Desktop Mini Player in English">
+    </td>
+    <td>
+      <img src="assets/screenshots/mini-player-tr.png" alt="YTMusic Desktop Mini Player in Turkish">
+    </td>
+  </tr>
+</table>
+
 ## Features
 
 ### Native Windows media controls
@@ -86,7 +128,7 @@ Shortcuts are configurable and persisted locally. Registrations are replaced tra
 
 ### Mini Player
 
-A compact always-available playback companion with:
+A compact playback companion with:
 
 - Artwork
 - Track title and artist
@@ -195,6 +237,7 @@ YTMusic Desktop avoids exposing broad native capabilities to that page:
 - Settings and Mini Player run as separate trusted local windows
 - Local Tauri capabilities are separated by window responsibility
 - Runtime command handlers validate the calling window where appropriate
+- DevTools are disabled in release builds
 
 This separation is intentional: native integrations consume application state from the Rust core rather than giving the remote page direct access to operating-system functionality.
 
@@ -272,7 +315,14 @@ src-tauri/target/release/bundle/
 ```text
 ytmusic-desktop/
 ├── assets/
-│   └── branding/
+│   ├── branding/
+│   │   └── app-icon.png
+│   └── screenshots/
+│       ├── main-page.png
+│       ├── settings-en.png
+│       ├── settings-tr.png
+│       ├── mini-player-en.png
+│       └── mini-player-tr.png
 ├── src/
 │   ├── settings/
 │   ├── mini-player/
@@ -324,7 +374,7 @@ The core desktop experience is implemented and has been manually validated on Wi
 - Windows application identity
 - NSIS and MSI installation
 
-The next milestone focuses on CI, repository polish and final `v0.1.0` acceptance.
+The remaining work before the stable `v0.1.0` release is focused on final production validation and release preparation.
 
 ## Known limitations
 
